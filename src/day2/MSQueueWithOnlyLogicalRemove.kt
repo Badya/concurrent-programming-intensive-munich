@@ -14,7 +14,16 @@ class MSQueueWithOnlyLogicalRemove<E> : QueueWithRemove<E> {
 
     override fun enqueue(element: E) {
         // TODO: Copy your implementation.
-        TODO("Implement me!")
+        while (true) {
+            val newNode = Node(element)
+            val tailNode = tail.get()
+            if (tailNode.next.compareAndSet(null, newNode)) {
+                tail.compareAndSet(tailNode, tailNode.next.get())
+                return
+            } else {
+                tail.compareAndSet(tailNode, tailNode.next.get())
+            }
+        }
     }
 
     override fun dequeue(): E? {
@@ -24,7 +33,14 @@ class MSQueueWithOnlyLogicalRemove<E> : QueueWithRemove<E> {
         // TODO: mark the node that contains the extracting
         // TODO: element as "extracted or removed", restarting
         // TODO: the operation if this node has already been removed.
-        TODO("Implement me!")
+        // TODO("Implement me!")
+        while (true) {
+            val curHead = head.get()
+            val nextHead = curHead.next.get() ?: return null
+            if (head.compareAndSet(curHead, nextHead))
+                if (nextHead.markExtractedOrRemoved())
+                    return nextHead.element
+        }
     }
 
     override fun remove(element: E): Boolean {
@@ -81,7 +97,7 @@ class MSQueueWithOnlyLogicalRemove<E> : QueueWithRemove<E> {
             // TODO: operation should return `true`.
             // TODO: Otherwise, the node is already either extracted or removed,
             // TODO: so the operation should return `false`.
-            TODO("Implement me!")
+            return markExtractedOrRemoved()
         }
     }
 }
