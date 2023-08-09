@@ -20,6 +20,7 @@ abstract class TestBase(
     @Test
     fun modelCheckingTest() = try {
         ModelCheckingOptions()
+            .logLevel(LoggingLevel.INFO)
             .iterations(scenarios)
             .invocationsPerIteration(10_000)
             .actorsBefore(actorsBefore)
@@ -38,6 +39,7 @@ abstract class TestBase(
     @Test
     fun stressTest() = try {
         StressOptions()
+            .logLevel(LoggingLevel.INFO)
             .iterations(scenarios)
             .invocationsPerIteration(25_000)
             .actorsBefore(actorsBefore)
