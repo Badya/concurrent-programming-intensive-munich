@@ -16,9 +16,21 @@ class AtomicArrayWithCAS2SingleWriter<E : Any>(size: Int, initialValue: E) {
         }
     }
 
+    @Suppress("WHEN_ENUM_CAN_BE_NULL_IN_JAVA")
     fun get(index: Int): E {
         // TODO: the cell can store CAS2Descriptor
-        return array[index] as E
+        // if the value is CAS2Descriptor
+        // UNDECIDED, FAILED -> expected
+        // SUCCESS -> update
+        val cell = array[index]
+        return if (cell is AtomicArrayWithCAS2SingleWriter<*>.CAS2Descriptor) {
+            when(cell.status.get()) {
+                UNDECIDED, FAILED -> if(index == cell.index1) cell.expected1 else cell.expected2
+                SUCCESS -> if(index == cell.index1) cell.update1 else cell.update2
+            }
+        } else {
+            cell
+        } as E
     }
 
     fun cas2(
@@ -45,6 +57,40 @@ class AtomicArrayWithCAS2SingleWriter<E : Any>(size: Int, initialValue: E) {
             // TODO: create functions for each of these three phases.
             // TODO: In this task, only one thread can call cas2(..),
             // TODO: so cas2(..) calls cannot be executed concurrently.
+
+            val success = install()
+            updateStatus(success)
+            updatePhysically()
+        }
+        private fun install(): Boolean {
+            if (!install(index1, expected1)) return false
+            return install(index2, expected2)
+        }
+
+        private fun install(index: Int, expected: E): Boolean {
+            if (status.get() != UNDECIDED) return false
+            while (true) {
+                when (array[index]) {
+                    expected -> {
+                        return if (array.compareAndSet(index, expected, this)) true else continue
+                    }
+                    else -> return false
+                }
+            }
+        }
+
+        private fun updateStatus(success: Boolean) {
+            status.compareAndSet(UNDECIDED, if (success) SUCCESS else FAILED)
+        }
+
+        private fun updatePhysically() {
+            if (status.get() == SUCCESS) {
+                array.compareAndSet(index1, this, update1)
+                array.compareAndSet(index2, this, update2)
+            } else {
+                array.compareAndSet(index1, this, expected1)
+                array.compareAndSet(index2, this, expected2)
+            }
         }
     }
 
