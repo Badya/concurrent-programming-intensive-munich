@@ -18,7 +18,15 @@ class AtomicArrayWithCAS2AndImplementedDCSS<E : Any>(size: Int, initialValue: E)
 
     fun get(index: Int): E {
         // TODO: Copy the implementation from `AtomicArrayWithCAS2Simplified`
-        TODO("Implement me")
+        val cell = array[index]
+        return if (cell is AtomicArrayWithCAS2AndImplementedDCSS<*>.CAS2Descriptor) {
+            when (cell.status.get()) {
+                SUCCESS -> cell.getUpdateValue(index)
+                else -> cell.getExpectedValue(index)
+            }
+        } else {
+            cell
+        } as E
     }
 
     fun cas2(
@@ -51,9 +59,54 @@ class AtomicArrayWithCAS2AndImplementedDCSS<E : Any>(size: Int, initialValue: E)
     ) {
         val status = AtomicReference(UNDECIDED)
 
+        fun getExpectedValue(index: Int) = if (index == index1) expected1 else expected2
+        fun getUpdateValue(index: Int) = if (index == index1) update1 else update2
+
         fun apply() {
-            // TODO: Copy the implementation from `AtomicArrayWithCAS2Simplified`
-            // TODO: and use `dcss(..)` to install the descriptor.
+            // TODO: Install the descriptor, update the status, and update the cells;
+            // TODO: create functions for each of these three phases.
+
+            val success = install()
+            updateStatus(success)
+            updatePhysically()
+        }
+
+        private fun install(): Boolean {
+            if (!install(index1, expected1)) return false
+            return install(index2, expected2)
+        }
+
+        private fun install(index: Int, expected: E): Boolean {
+            while (true) {
+                if (status.get() != UNDECIDED) return false
+                when (val cell = array[index]) {
+                    this -> return true
+
+                    is AtomicArrayWithCAS2AndImplementedDCSS<*>.CAS2Descriptor -> {
+                        cell.apply()
+                    }
+
+                    expected -> {
+                        return if (dcss(index, expected, this, status, UNDECIDED)) true else continue
+                    }
+
+                    else -> return false
+                }
+            }
+        }
+
+        private fun updateStatus(success: Boolean) {
+            status.compareAndSet(UNDECIDED, if (success) SUCCESS else FAILED)
+        }
+
+        private fun updatePhysically() {
+            if (status.get() == SUCCESS) {
+                array.compareAndSet(index1, this, update1)
+                array.compareAndSet(index2, this, update2)
+            } else {
+                array.compareAndSet(index1, this, expected1)
+                array.compareAndSet(index2, this, expected2)
+            }
         }
     }
 
